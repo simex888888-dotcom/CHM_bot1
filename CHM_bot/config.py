@@ -21,7 +21,7 @@ class Config:
 
     COIN_MODE            = "auto"
     AUTO_MIN_VOLUME_USDT = 1_000_000
-    AUTO_MAX_COINS       = 0
+    AUTO_MAX_COINS       = 100
     AUTO_BLACKLIST       = [
         "USDCUSDT", "BUSDUSDT", "TUSDUSDT", "USDPUSDT",
         "EURUSDT",  "GBPUSDT",  "RUBUSDT",  "FDUSDUSDT",
