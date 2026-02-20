@@ -120,7 +120,6 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
 
     async def get_candles(
         self,
-        self,
         symbol: str,
         timeframe: str,
         limit: int = 300,
