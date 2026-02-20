@@ -15,9 +15,6 @@ class Config:
     import os
     TELEGRAM_TOKEN   = os.getenv("BOT_TOKEN_CHM")
     TELEGRAM_CHAT_ID = os.getenv("CHAT_ID")
-
-
-
     # ═══════════════════════════════════════════════════════
     #  📊 РЕЖИМ ВЫБОРА МОНЕТ
     # ═══════════════════════════════════════════════════════
@@ -50,7 +47,7 @@ class Config:
     PIVOT_STRENGTH  = 7
     ATR_PERIOD      = 14
     ATR_MULT        = 1.0
-    MAX_RISK_PCT    = 2.0
+    MAX_RISK_PCT    = 2.5
     EMA_FAST        = 50
     EMA_SLOW        = 200
     RSI_PERIOD      = 14

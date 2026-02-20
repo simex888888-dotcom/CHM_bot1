@@ -5,7 +5,7 @@
 import json
 import os
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from typing import Optional
 
 log = logging.getLogger("CHM.Users")
@@ -14,35 +14,43 @@ USERS_FILE = "users.json"
 
 @dataclass
 class UserSettings:
-    user_id:        int
-    username:       str    = ""
-    active:         bool   = False   # включён ли сканер
+    user_id:          int
+    username:         str   = ""
+    active:           bool  = False
 
     # Таймфрейм и интервал
-    timeframe:      str    = "1h"
-    scan_interval:  int    = 3600
+    timeframe:        str   = "1h"
+    scan_interval:    int   = 3600
 
-    # Фильтры
-    use_rsi:        bool   = True
-    use_volume:     bool   = True
-    use_pattern:    bool   = True
-    use_htf:        bool   = True
-    min_quality:    int    = 3
+    # Фильтры CHM BREAKER
+    use_rsi:          bool  = True
+    use_volume:       bool  = True
+    use_pattern:      bool  = True
+    use_htf:          bool  = True
+    min_quality:      int   = 3
+
+    # SMC фильтры
+    use_smc:          bool  = True
+    use_ob:           bool  = True
+    use_fvg:          bool  = True
+    use_liq:          bool  = True
+    use_bos:          bool  = True
+    min_smc_score:    int   = 1   # минимум SMC подтверждений (0 = выкл)
 
     # Параметры сигнала
-    tp1_rr:         float  = 0.8
-    tp2_rr:         float  = 1.5
-    tp3_rr:         float  = 2.5
-    atr_mult:       float  = 1.0
-    max_risk_pct:   float  = 1.5
-    min_volume_usdt:float  = 1_000_000
+    tp1_rr:           float = 0.8
+    tp2_rr:           float = 1.5
+    tp3_rr:           float = 2.5
+    atr_mult:         float = 1.0
+    max_risk_pct:     float = 1.5
+    min_volume_usdt:  float = 1_000_000
 
     # Уведомления
-    notify_signal:   bool  = True
-    notify_breakout: bool  = False
+    notify_signal:    bool  = True
+    notify_breakout:  bool  = False
 
     # Статистика
-    signals_received: int  = 0
+    signals_received: int   = 0
 
 
 class UserManager:
@@ -57,7 +65,10 @@ class UserManager:
                 with open(USERS_FILE, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 for uid, d in data.items():
-                    self._users[int(uid)] = UserSettings(**d)
+                    # Совместимость со старыми профилями — добавляем новые поля
+                    defaults = asdict(UserSettings(user_id=int(uid)))
+                    merged   = {**defaults, **d}
+                    self._users[int(uid)] = UserSettings(**merged)
                 log.info(f"Загружено пользователей: {len(self._users)}")
             except Exception as e:
                 log.error(f"Ошибка загрузки users.json: {e}")
@@ -68,7 +79,7 @@ class UserManager:
             with open(USERS_FILE, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            log.error(f"Ошибка сохранения users.json: {e}")
+            log.error(f"Ошибка сохранения: {e}")
 
     def get(self, user_id: int) -> Optional[UserSettings]:
         return self._users.get(user_id)
@@ -84,8 +95,8 @@ class UserManager:
         self._users[user.user_id] = user
         self._save()
 
-    def get_active_users(self) -> list[UserSettings]:
+    def get_active_users(self) -> list:
         return [u for u in self._users.values() if u.active]
 
-    def all_users(self) -> list[UserSettings]:
+    def all_users(self) -> list:
         return list(self._users.values())

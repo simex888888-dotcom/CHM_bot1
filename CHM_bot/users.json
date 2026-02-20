@@ -38,7 +38,7 @@
     "max_risk_pct": 1.5,
     "min_volume_usdt": 1000000,
     "notify_signal": true,
-    "notify_breakout": false,
+    "notify_breakout": true,
     "signals_received": 11
   }
 }
