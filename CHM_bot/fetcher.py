@@ -120,12 +120,17 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
 
     async def get_candles(
         self,
+        self,
         symbol: str,
         timeframe: str,
         limit: int = 300,
         retries: int = 3,
     ) -> Optional[pd.DataFrame]:
+        # небольшая пауза перед каждым запросом за свечами
+        await asyncio.sleep(0.2)  # 0.2 секунды — можешь увеличить до 0.3–0.5 при необходимости
+
         interval = TIMEFRAME_MAP.get(timeframe, "1H")
+
 
         # OKX использует формат BTC-USDT-SWAP
         okx_symbol = self._to_okx(symbol)
@@ -194,11 +199,15 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
 
     async def get_ticker_price(self, symbol: str) -> Optional[float]:
         try:
+            # пауза перед запросом тикера
+            await asyncio.sleep(0.2)
+
             session = await self._get_session()
             async with session.get(
                 OKX_TICKERS,
                 params={"instId": self._to_okx(symbol)},
             ) as resp:
+
                 if resp.status == 200:
                     d = await resp.json()
                     return float(d["data"][0]["last"])
@@ -208,11 +217,15 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
 
     async def get_24h_change(self, symbol: str) -> Optional[dict]:
         try:
+            # пауза перед запросом 24h-данных
+            await asyncio.sleep(0.2)
+
             session = await self._get_session()
             async with session.get(
                 OKX_TICKERS,
                 params={"instId": self._to_okx(symbol)},
             ) as resp:
+
                 if resp.status == 200:
                     d = await resp.json()
                     t = d["data"][0]
