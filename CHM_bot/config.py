@@ -44,24 +44,24 @@ class Config:
     #  ⚙️  ПАРАМЕТРЫ ИНДИКАТОРА
     # ═══════════════════════════════════════════════════════
 
-    PIVOT_STRENGTH  = 7
+    PIVOT_STRENGTH  = 10
     ATR_PERIOD      = 14
-    ATR_MULT        = 1.0
+    ATR_MULT        = 2.5
     MAX_RISK_PCT    = 2.5
-    EMA_FAST        = 50
+    EMA_FAST        = 21
     EMA_SLOW        = 200
     RSI_PERIOD      = 14
-    RSI_OB          = 65
-    RSI_OS          = 35
-    VOL_MULT        = 1.2
+    RSI_OB          = 70
+    RSI_OS          = 30
+    VOL_MULT        = 2.0
     VOL_LEN         = 20
-    MAX_LEVEL_AGE   = 100
-    MAX_RETEST_BARS = 30
-    COOLDOWN_BARS   = 10
-    ZONE_BUFFER     = 0.3
-    TP1_RR          = 0.8
-    TP2_RR          = 1.5
-    TP3_RR          = 2.5
+    MAX_LEVEL_AGE   = 50
+    MAX_RETEST_BARS = 15
+    COOLDOWN_BARS   = 15
+    ZONE_BUFFER     = 0.15
+    TP1_RR          = 1.0
+    TP2_RR          = 2.0
+    TP3_RR          = 3.5
     HTF_TIMEFRAME   = "1h"
     HTF_EMA_PERIOD  = 60
 
