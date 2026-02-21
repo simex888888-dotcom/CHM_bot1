@@ -1,5 +1,5 @@
 """
-Загрузка данных с OKX (работает в России и большинстве стран)
+Загрузка данных с OKX
 """
 
 import logging
@@ -22,31 +22,43 @@ TIMEFRAME_MAP = {
     "6h":  "6H",  "12h": "12H", "1d":  "1D",  "1w":  "1W",
 }
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Origin": "https://www.okx.com",
+    "Referer": "https://www.okx.com/",
+}
 
-class BinanceFetcher:  # имя оставляем чтобы не менять другие файлы
+
+class BinanceFetcher:
 
     def __init__(self):
         self._session: Optional[aiohttp.ClientSession] = None
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            timeout   = aiohttp.ClientTimeout(total=15)
+            timeout   = aiohttp.ClientTimeout(total=30, connect=10)
             ssl_ctx   = ssl.create_default_context(cafile=certifi.where())
-            connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+            connector = aiohttp.TCPConnector(
+                ssl=ssl_ctx,
+                limit=10,
+                limit_per_host=5,
+                keepalive_timeout=30,
+                enable_cleanup_closed=True,
+            )
             self._session = aiohttp.ClientSession(
                 timeout=timeout,
                 connector=connector,
-                headers={"User-Agent": "Mozilla/5.0"},
+                headers=HEADERS,
             )
         return self._session
 
     async def close(self):
         if self._session and not self._session.closed:
             await self._session.close()
-
-    # ─────────────────────────────────────────────
-    #  Автозагрузка списка монет с OKX
-    # ─────────────────────────────────────────────
 
     async def get_all_usdt_pairs(
         self,
@@ -55,16 +67,13 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
         max_coins: int = 0,
     ) -> list:
         blacklist = blacklist or []
-        log.info("🌐 Загружаю список всех монет с OKX...")
+        log.info("🌐 Загружаю список монет с OKX...")
 
         try:
             session = await self._get_session()
+            await asyncio.sleep(0.5)  # небольшая пауза перед запросом
 
-            # Все USDT-SWAP инструменты (фьючерсы с USDT)
-            async with session.get(
-                OKX_SYMBOLS,
-                params={"instType": "SWAP"},
-            ) as resp:
+            async with session.get(OKX_SYMBOLS, params={"instType": "SWAP"}) as resp:
                 if resp.status != 200:
                     log.error(f"instruments HTTP {resp.status}")
                     return []
@@ -77,13 +86,11 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
                 and s["state"] == "live"
                 and s["instId"] not in blacklist
             }
-            log.info(f"  Найдено активных USDT пар: {len(all_usdt)}")
+            log.info(f"  Найдено: {len(all_usdt)} USDT пар")
 
-            # Тикеры для фильтра по объёму
-            async with session.get(
-                OKX_TICKERS,
-                params={"instType": "SWAP"},
-            ) as resp:
+            await asyncio.sleep(0.5)
+
+            async with session.get(OKX_TICKERS, params={"instType": "SWAP"}) as resp:
                 if resp.status != 200:
                     log.error(f"tickers HTTP {resp.status}")
                     return sorted(all_usdt)
@@ -103,20 +110,15 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
 
             filtered.sort(key=lambda x: x[1], reverse=True)
             coins = [sym for sym, _ in filtered]
-
             if max_coins and max_coins > 0:
                 coins = coins[:max_coins]
 
-            log.info(f"  После фильтра по объёму: {len(coins)} монет")
+            log.info(f"  После фильтра объёма: {len(coins)} монет")
             return coins
 
         except Exception as e:
-            log.error(f"Ошибка получения списка монет: {e}")
+            log.error(f"Ошибка получения монет: {e}")
             return []
-
-    # ─────────────────────────────────────────────
-    #  Свечи с OKX
-    # ─────────────────────────────────────────────
 
     async def get_candles(
         self,
@@ -125,28 +127,18 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
         limit: int = 300,
         retries: int = 3,
     ) -> Optional[pd.DataFrame]:
-        # небольшая пауза перед каждым запросом за свечами
-        await asyncio.sleep(0.2)  # 0.2 секунды — можешь увеличить до 0.3–0.5 при необходимости
-
-        interval = TIMEFRAME_MAP.get(timeframe, "1H")
-
-
-        # OKX использует формат BTC-USDT-SWAP
+        interval   = TIMEFRAME_MAP.get(timeframe, "1H")
         okx_symbol = self._to_okx(symbol)
-
-        params = {
-            "instId": okx_symbol,
-            "bar":    interval,
-            "limit":  str(min(limit, 300)),
-        }
+        params     = {"instId": okx_symbol, "bar": interval, "limit": str(min(limit, 300))}
 
         for attempt in range(1, retries + 1):
             try:
                 session = await self._get_session()
+                await asyncio.sleep(0.1)  # небольшая пауза между запросами
                 async with session.get(OKX_CANDLES, params=params) as resp:
                     if resp.status != 200:
                         text = await resp.text()
-                        log.warning(f"{symbol} HTTP {resp.status}: {text[:80]}")
+                        log.warning(f"{symbol} HTTP {resp.status}: {text[:60]}")
                         return None
                     data = await resp.json()
 
@@ -154,22 +146,13 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
                 if not rows:
                     return None
 
-                # OKX: [ts, open, high, low, close, vol, volCcy, volCcyQuote, confirm]
-                # возвращает новые первые — разворачиваем
                 rows = list(reversed(rows))
-
-                df = pd.DataFrame(rows, columns=[
-                    "open_time", "open", "high", "low", "close",
-                    "vol", "volCcy", "volCcyQuote", "confirm"
-                ])
-                df = df[["open_time", "open", "high", "low", "close", "volCcyQuote"]].copy()
+                df   = pd.DataFrame(rows, columns=["open_time","open","high","low","close","vol","volCcy","volCcyQuote","confirm"])
+                df   = df[["open_time","open","high","low","close","volCcyQuote"]].copy()
                 df.rename(columns={"volCcyQuote": "volume"}, inplace=True)
-                df[["open", "high", "low", "close", "volume"]] = \
-                    df[["open", "high", "low", "close", "volume"]].astype(float)
-                df = df.assign(open_time=pd.to_datetime(df["open_time"].astype(float), unit="ms"))
+                df[["open","high","low","close","volume"]] = df[["open","high","low","close","volume"]].astype(float)
+                df["open_time"] = pd.to_datetime(df["open_time"].astype(float), unit="ms")
                 df.set_index("open_time", inplace=True)
-
-                # Убираем незакрытую свечу (confirm == "0")
                 df = df.iloc[:-1]
                 return df
 
@@ -183,30 +166,17 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
 
         return None
 
-    # ─────────────────────────────────────────────
-    #  Вспомогательные
-    # ─────────────────────────────────────────────
-
     @staticmethod
     def _to_okx(symbol: str) -> str:
-        """BTCUSDT → BTC-USDT-SWAP"""
         symbol = symbol.replace(" ", "")
         if symbol.endswith("USDT") and "-" not in symbol:
-            base = symbol[:-4]
-            return f"{base}-USDT-SWAP"
+            return f"{symbol[:-4]}-USDT-SWAP"
         return symbol
 
     async def get_ticker_price(self, symbol: str) -> Optional[float]:
         try:
-            # пауза перед запросом тикера
-            await asyncio.sleep(0.2)
-
             session = await self._get_session()
-            async with session.get(
-                OKX_TICKERS,
-                params={"instId": self._to_okx(symbol)},
-            ) as resp:
-
+            async with session.get(OKX_TICKERS, params={"instId": self._to_okx(symbol)}) as resp:
                 if resp.status == 200:
                     d = await resp.json()
                     return float(d["data"][0]["last"])
@@ -216,26 +186,19 @@ class BinanceFetcher:  # имя оставляем чтобы не менять 
 
     async def get_24h_change(self, symbol: str) -> Optional[dict]:
         try:
-            # пауза перед запросом 24h-данных
-            await asyncio.sleep(0.2)
-
             session = await self._get_session()
-            async with session.get(
-                OKX_TICKERS,
-                params={"instId": self._to_okx(symbol)},
-            ) as resp:
-
+            async with session.get(OKX_TICKERS, params={"instId": self._to_okx(symbol)}) as resp:
                 if resp.status == 200:
-                    d = await resp.json()
-                    t = d["data"][0]
-                    last  = float(t.get("last",  0))
-                    open_ = float(t.get("open24h", last))
-                    chg   = ((last - open_) / open_ * 100) if open_ else 0
+                    d    = await resp.json()
+                    t    = d["data"][0]
+                    last = float(t.get("last", 0))
+                    op   = float(t.get("open24h", last))
+                    chg  = ((last - op) / op * 100) if op else 0
                     return {
                         "change_pct":  chg,
                         "volume_usdt": float(t.get("volCcy24h", 0)),
-                        "high":        float(t.get("high24h", 0)),
-                        "low":         float(t.get("low24h",  0)),
+                        "high":        float(t.get("highPrice24h", 0) or t.get("high24h", 0)),
+                        "low":         float(t.get("lowPrice24h",  0) or t.get("low24h",  0)),
                     }
         except Exception:
             pass
